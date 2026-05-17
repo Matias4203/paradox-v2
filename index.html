@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Feature-Policy" content="geolocation *">
+<title>LastStop – Transporte Urbano</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="css/styles.css">
+<style>
+/* ── APP-SPECIFIC STYLES ── */
+body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+.auth-ov { position:fixed;inset:0;background:linear-gradient(135deg,#0a0f1e,#0d1929,#0a1520);z-index:9999;display:flex;align-items:center;justify-content:center; }
+.auth-ov.gone { display:none; }
+.auth-box { background:var(--surface);border:1px solid var(--border);border-radius:24px;width:420px;max-width:95vw;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.7); }
+.auth-header { background:linear-gradient(135deg,#1a2a6c,#2563eb);padding:28px 32px;text-align:center; }
+.auth-logo { font-size:32px;font-weight:900;letter-spacing:-1px;margin-bottom:4px; }
+.auth-logo span { color:var(--amber-light); }
+.auth-sub { font-size:13px;color:rgba(255,255,255,.6); }
+.auth-tabs { display:flex;border-bottom:1px solid var(--border); }
+.auth-tab { flex:1;padding:14px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;text-align:center;transition:all .2s;border:none;background:transparent; }
+.auth-tab.active { color:var(--blue-light);border-bottom:2px solid var(--blue); }
+.auth-body { padding:28px 32px;display:flex;flex-direction:column;gap:14px; }
+.auth-panel { display:none; }
+.auth-panel.show { display:flex;flex-direction:column;gap:14px; }
+.inp-group { display:flex;flex-direction:column;gap:6px; }
+.inp-group label { font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px; }
+.auth-divider { display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px; }
+.auth-divider::before,.auth-divider::after { content:'';flex:1;height:1px;background:var(--border); }
+.auth-err { background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:10px 14px;font-size:13px;color:#fca5a5;display:none; }
+.auth-err.show { display:block; }
+
+header { background:linear-gradient(135deg,#1a2a6c,#2563eb);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-shadow:0 4px 20px rgba(37,99,235,.3);z-index:1000; }
+.logo { font-size:20px;font-weight:900;letter-spacing:-.5px; }
+.logo span { color:var(--amber-light); }
+.hright { display:flex;align-items:center;gap:8px; }
+.user-pill { display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border-radius:20px;padding:5px 12px 5px 8px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s; }
+.user-pill:hover { background:rgba(255,255,255,.2); }
+.user-pill .av { font-size:18px; }
+.gps-pill { font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;display:flex;align-items:center;gap:5px; }
+.gps-ok  { background:rgba(34,197,94,.2);color:#4ade80;border:1px solid rgba(34,197,94,.3); }
+.gps-off { background:rgba(120,120,140,.15);color:var(--muted);border:1px solid var(--border); }
+.dot { width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1.5s infinite; }
+.btn-admin { background:rgba(245,158,11,.2);border:1px solid rgba(245,158,11,.3);border-radius:10px;color:var(--amber-light);font-size:12px;font-weight:700;padding:5px 10px;cursor:pointer;transition:all .2s;text-decoration:none;display:flex;align-items:center;gap:5px; }
+.btn-admin:hover { background:rgba(245,158,11,.3); }
+
+.app-body { flex:1;display:grid;grid-template-columns:360px 1fr;overflow:hidden; }
+
+.panel { background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden; }
+.panel-top { padding:14px 14px 0;flex-shrink:0; }
+.plabel { font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:8px; }
+.city-wrap { position:relative;margin-bottom:10px; }
+.city-sel { width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;color:var(--text);padding:9px 32px 9px 36px;font-family:'Figtree',sans-serif;font-size:14px;font-weight:600;appearance:none;cursor:pointer; }
+.city-sel:focus { outline:none;border-color:var(--blue); }
+.city-ico { position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none; }
+.city-arr { position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;font-size:11px; }
+.frow { display:flex;gap:5px;margin-bottom:10px; }
+.ftab { flex:1;padding:7px 4px;border:1.5px solid var(--border);border-radius:10px;background:transparent;color:var(--muted);font-family:'Figtree',sans-serif;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;transition:all .2s; }
+.ftab.on-bus { background:#1d4ed8;border-color:var(--blue);color:white; }
+.ftab.on-col { background:#92400e;border-color:var(--amber);color:var(--amber-light); }
+.ftab.on-all { background:var(--surface2);border-color:#4b5563;color:var(--text); }
+.srch { position:relative;margin-bottom:8px; }
+.srch input { width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;color:var(--text);padding:9px 12px 9px 34px;font-family:'Figtree',sans-serif;font-size:13px; }
+.srch input:focus { outline:none;border-color:var(--blue); }
+.srch input::placeholder { color:var(--muted); }
+.srch-ico { position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px; }
+.radius-row { display:flex;align-items:center;gap:8px;margin-bottom:10px; }
+.radius-row label { font-size:10px;font-weight:700;color:var(--muted);white-space:nowrap; }
+.radius-row input[type=range] { flex:1;accent-color:var(--blue); }
+.radius-val { font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,.15);padding:1px 7px;border-radius:5px;white-space:nowrap; }
+.panel-mid { display:flex;align-items:center;justify-content:space-between;margin-bottom:8px; }
+.btn-sm { background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:5px 10px;font-family:'Figtree',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s; }
+.btn-sm:hover { background:var(--border); }
+
+.scroll { flex:1;overflow-y:auto;padding:0 10px 10px; }
+.sc { background:var(--surface2);border:1.5px solid var(--border);border-radius:13px;padding:11px 13px;margin-bottom:7px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;animation:fi .3s ease both; }
+.sc::before { content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px;background:var(--blue);opacity:0;transition:opacity .2s; }
+.sc.sel { border-color:var(--blue);background:#1b2848; }
+.sc.sel::before { opacity:1; }
+.sc:hover:not(.sel) { border-color:#3b4a6b;transform:translateX(2px); }
+.sc-top { display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px; }
+.sc-name { font-size:12px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.sc-dist { font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:var(--blue-light);background:rgba(59,130,246,.15);padding:2px 7px;border-radius:5px;white-space:nowrap; }
+.chips { display:flex;flex-wrap:wrap;gap:3px;margin-top:4px; }
+.sc-next { font-size:10px;font-weight:600;margin-top:4px; }
+
+.right { display:flex;flex-direction:column;flex:1;overflow:hidden; }
+.map-wrap { flex:1;position:relative; }
+#map { width:100%;height:100%; }
+.map-controls { position:absolute;top:12px;right:12px;z-index:500;display:flex;flex-direction:column;gap:6px; }
+.mc-btn { background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,.3); }
+.mc-btn:hover { background:var(--surface2); }
+.mc-btn.act { background:var(--blue);border-color:var(--blue); }
+.loc-picker { position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:500;background:var(--surface);border:1px solid var(--border);border-radius:30px;padding:8px 18px;font-size:12px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer;transition:all .2s; }
+.loc-picker:hover { background:var(--surface2); }
+.loc-picker.picking { background:rgba(59,130,246,.2);border-color:var(--blue);color:var(--blue-light); }
+
+.dbar { background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;overflow:hidden;transition:max-height .3s ease; }
+.dbar.closed { max-height:0; }
+.dbar.open { max-height:340px; }
+.dbar-inner { padding:0 20px 16px;overflow-y:auto;max-height:340px; }
+.dh { padding:12px 0 10px;display:flex;align-items:flex-start;justify-content:space-between;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:5; }
+.dh-info { flex:1; }
+.dh-t { font-size:15px;font-weight:800; }
+.dh-t em { color:var(--blue-light);font-style:normal; }
+.dh-addr { font-size:11px;color:var(--muted);margin-top:2px; }
+.dh-x { background:var(--surface2);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;font-size:13px;flex-shrink:0;transition:all .2s; }
+.dh-x:hover { background:var(--border);color:var(--text); }
+.h-tabs { display:flex;gap:4px;margin:10px 0 8px; }
+.h-tab { padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Figtree',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s; }
+.h-tab.act { background:var(--blue);border-color:var(--blue);color:white; }
+.dl { font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin:10px 0 6px; }
+.dr { display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(42,47,66,.5);animation:fi .3s ease both; }
+.dr:last-child { border-bottom:none; }
+.dico { width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0; }
+.im { background:#172554; } .ic { background:#451a03; }
+.dinfo { flex:1;min-width:0; }
+.dname { font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.nm { color:var(--blue-light); } .nc { color:var(--amber-light); }
+.ddesc { font-size:11px;color:var(--muted);margin-top:1px; }
+.dtime { text-align:right;flex-shrink:0; }
+.dtime-min { font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700; }
+.dtime-lbl { font-size:9px;color:var(--muted);font-family:'Figtree',sans-serif; }
+.dtime-hora { font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted); }
+.h-grid { display:flex;flex-wrap:wrap;gap:5px;margin-top:4px; }
+.h-chip { font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--muted); }
+.h-chip.proximo { background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.4);color:#4ade80;font-weight:700; }
+.btn-trayecto { display:flex;align-items:center;gap:6px;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);border-radius:9px;color:var(--blue-light);font-size:12px;font-weight:700;padding:6px 12px;cursor:pointer;transition:all .2s;margin-top:6px; }
+.btn-trayecto:hover { background:rgba(59,130,246,.25); }
+.btn-trayecto.act { background:rgba(59,130,246,.3);border-color:var(--blue); }
+.pop { padding:14px;min-width:220px; }
+.pop-name { font-size:14px;font-weight:800;margin-bottom:10px; }
+.pop-row { display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px; }
+.pop-row:last-child { border-bottom:none; }
+.pop-num { font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px; }
+.pm { color:var(--blue-light); } .pc { color:var(--amber-light); }
+.pop-desc { flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.pop-min { font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px; }
+.ts { color:var(--green); } .tm { color:var(--amber); } .tl { color:var(--muted); }
+
+.user-menu { position:absolute;top:62px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:2000;display:none; }
+.user-menu.show { display:block; }
+.um-item { display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s;color:var(--text); }
+.um-item:hover { background:var(--surface2); }
+.um-item.danger { color:#fca5a5; }
+.um-sep { height:1px;background:var(--border);margin:4px 0; }
+</style>
+</head>
+<body>
+
+<!-- AUTH OVERLAY -->
+<div class="auth-ov" id="authOv">
+  <div class="auth-box">
+    <div class="auth-header">
+      <div class="auth-logo">Last<span>Stop</span></div>
+      <div class="auth-sub">Transporte urbano en tiempo real</div>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="showTab('login')">Iniciar sesión</button>
+      <button class="auth-tab" onclick="showTab('registro')">Registrarse</button>
+    </div>
+    <div class="auth-body">
+      <div class="auth-panel show" id="panLogin">
+        <div class="inp-group"><label>EMAIL</label><input class="inp" id="loginEmail" type="email" placeholder="tu@email.com"></div>
+        <div class="inp-group"><label>CONTRASEÑA</label><input class="inp" id="loginPass" type="password" placeholder="••••••••"></div>
+        <div class="auth-err" id="loginErr"></div>
+        <button class="btn-main" onclick="doLogin()">Entrar →</button>
+        <div class="auth-divider">o</div>
+        <button class="btn-ghost" onclick="doInvitado()">👤 Continuar como invitado</button>
+      </div>
+      <div class="auth-panel" id="panRegistro">
+        <div class="inp-group"><label>NOMBRE</label><input class="inp" id="regNombre" type="text" placeholder="Tu nombre"></div>
+        <div class="inp-group"><label>EMAIL</label><input class="inp" id="regEmail" type="email" placeholder="tu@email.com"></div>
+        <div class="inp-group"><label>CONTRASEÑA</label><input class="inp" id="regPass" type="password" placeholder="Mínimo 4 caracteres"></div>
+        <div class="auth-err" id="regErr"></div>
+        <button class="btn-main" onclick="doRegistro()">Crear cuenta →</button>
+        <div class="auth-divider">o</div>
+        <button class="btn-ghost" onclick="doInvitado()">👤 Continuar como invitado</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- USER MENU -->
+<div class="user-menu" id="userMenu">
+  <div class="um-item" id="umNombre">👤 Usuario</div>
+  <div class="um-sep"></div>
+  <div class="um-item" id="umAdmin" style="display:none" onclick="window.open('admin.html','_blank')">👑 Panel Admin</div>
+  <div class="um-item danger" onclick="doLogout()">🚪 Cerrar sesión</div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">Last<span>Stop</span></div>
+  <div class="hright">
+    <div class="gps-pill gps-off" id="gpsPill"><div class="dot"></div><span id="gpsLbl">Sin GPS</span></div>
+    <a href="admin.html" id="btnAdminHdr" class="btn-admin" style="display:none" target="_blank">👑 Admin</a>
+    <div class="user-pill" id="userPill" onclick="toggleMenu()">
+      <span class="av" id="userAv">👤</span>
+      <span id="userName">Usuario</span>
+    </div>
+  </div>
+</header>
+
+<!-- APP -->
+<div class="app-body">
+  <div class="panel">
+    <div class="panel-top">
+      <div class="plabel">📍 Ciudad</div>
+      <div class="city-wrap">
+        <span class="city-ico">🏙️</span>
+        <select class="city-sel" id="citySel">
+          <option value="Santiago">Santiago</option>
+          <option value="Rancagua" selected>Rancagua</option>
+          <option value="Valparaíso">Valparaíso</option>
+          <option value="Concepción">Concepción</option>
+          <option value="Temuco">Temuco</option>
+        </select>
+        <span class="city-arr">▼</span>
+      </div>
+      <div class="frow">
+        <button class="ftab on-bus" data-f="bus">🚌 Micros</button>
+        <button class="ftab" data-f="col">🚕 Colectivos</button>
+        <button class="ftab" data-f="all">ℹ️ Todos</button>
+      </div>
+      <div class="srch">
+        <span class="srch-ico">🔍</span>
+        <input id="srchInput" type="text" placeholder="Buscar paradero o ruta...">
+      </div>
+      <div class="radius-row">
+        <label>📏 Radio:</label>
+        <input type="range" id="radiusSlider" min="300" max="3000" step="100" value="1000" oninput="updateRadius(this.value)">
+        <span class="radius-val" id="radiusVal">1 km</span>
+      </div>
+      <div class="panel-mid">
+        <div class="plabel" style="margin:0" id="countLabel">Paraderos</div>
+        <button class="btn-sm" onclick="activarGPS()">📡 Mi ubicación</button>
+      </div>
+    </div>
+    <div class="scroll" id="stopList">
+      <div class="empty"><div class="spin"></div></div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="map-controls">
+        <div class="mc-btn" title="Mi ubicación" onclick="centrarEnMi()">📍</div>
+        <div class="mc-btn" id="btnTrayecto" title="Ver trayectos" onclick="toggleTrayectos()">🗺️</div>
+      </div>
+      <div class="loc-picker" id="locPicker" onclick="togglePicker()">📌 Seleccionar ubicación en mapa</div>
+    </div>
+    <div class="dbar closed" id="dbar">
+      <div class="dbar-inner" id="dbarInner"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/db.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

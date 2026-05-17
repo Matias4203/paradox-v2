@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LastStop – Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sb-header">
+    <div class="sb-logo">Last<span>Stop</span></div>
+    <div class="sb-role">Panel Admin</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="nav-item active" onclick="goPage('dashboard')"><span class="nav-ico">📊</span> Dashboard</div>
+    <div class="nav-item" onclick="goPage('paraderos')"><span class="nav-ico">🚏</span> Paraderos</div>
+    <div class="nav-item" onclick="goPage('rutas')"><span class="nav-ico">🗺️</span> Rutas</div>
+    <div class="nav-item" onclick="goPage('usuarios')"><span class="nav-ico">👥</span> Usuarios</div>
+    <div class="nav-item" onclick="goPage('horarios')"><span class="nav-ico">🕐</span> Horarios</div>
+  </nav>
+  <div class="sb-footer">
+    <button class="sb-btn" onclick="window.open('index.html','_blank')">🚌 Ver app</button>
+    <button class="sb-btn" onclick="DB.auth.logout();window.location='index.html'">🚪 Salir</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- DASHBOARD -->
+  <div class="page show" id="pageDashboard">
+    <div class="page-title">📊 Dashboard</div>
+    <div class="page-sub">Resumen del sistema en tiempo real</div>
+    <div class="stats-grid" id="statsGrid"></div>
+    <div class="chart-row">
+      <div class="chart-card"><div class="chart-title">Paraderos por ciudad</div><div id="chartCiudades"></div></div>
+      <div class="chart-card"><div class="chart-title">Rutas por tipo</div><div id="chartTipos"></div></div>
+    </div>
+    <div class="section-header"><div class="section-title">🕐 Actividad reciente</div></div>
+    <div class="activity-card" id="actFeed"></div>
+  </div>
+
+  <!-- PARADEROS -->
+  <div class="page" id="pageParaderos">
+    <div class="page-title">🚏 Paraderos</div>
+    <div class="page-sub">Gestión de paraderos en todas las ciudades</div>
+    <div class="section-header">
+      <input class="table-search" id="srchParaderos" placeholder="🔍 Buscar paradero..." oninput="renderTablaParaderos()">
+      <button class="btn-add" onclick="abrirModalParadero()">+ Agregar paradero</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nombre</th><th>Ciudad</th><th>Rutas</th><th>Coordenadas</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody id="tbodyParaderos"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RUTAS -->
+  <div class="page" id="pageRutas">
+    <div class="page-title">🗺️ Rutas</div>
+    <div class="page-sub">Gestión de rutas de micros y colectivos</div>
+    <div class="section-header">
+      <input class="table-search" id="srchRutas" placeholder="🔍 Buscar ruta..." oninput="renderTablaRutas()">
+      <button class="btn-add" onclick="abrirModalRuta()">+ Agregar ruta</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Ruta</th><th>Ciudad</th><th>Tipo</th><th>Paraderos</th><th>Frecuencia</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody id="tbodyRutas"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- USUARIOS -->
+  <div class="page" id="pageUsuarios">
+    <div class="page-title">👥 Usuarios</div>
+    <div class="page-sub">Gestión de cuentas registradas</div>
+    <div class="section-header">
+      <input class="table-search" id="srchUsuarios" placeholder="🔍 Buscar usuario..." oninput="renderTablaUsuarios()">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Usuario</th><th>Email</th><th>Rol</th><th>Creado</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody id="tbodyUsuarios"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- HORARIOS -->
+  <div class="page" id="pageHorarios">
+    <div class="page-title">🕐 Horarios</div>
+    <div class="page-sub">Vista detallada de horarios por ruta</div>
+    <div id="horariosContent"></div>
+  </div>
+
+</div>
+
+<!-- MODAL PARADERO -->
+<div class="modal-bg" id="modalParadero">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="mParaderoTitle">Agregar Paradero</div>
+      <button class="modal-x" onclick="cerrarModal('modalParadero')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field form-full"><label>NOMBRE</label><input id="mpNombre" placeholder="Ej: Alameda con San Martín"></div>
+        <div class="field form-full"><label>DIRECCIÓN</label><input id="mpDireccion" placeholder="Dirección completa"></div>
+        <div class="field"><label>CIUDAD</label>
+          <select id="mpCiudad"><option>Santiago</option><option>Rancagua</option><option>Valparaíso</option><option>Concepción</option><option>Temuco</option></select>
+        </div>
+        <div class="field"><label>LATITUD</label><input id="mpLat" type="number" step="any" placeholder="-34.1703"></div>
+        <div class="field"><label>LONGITUD</label><input id="mpLng" type="number" step="any" placeholder="-70.7444"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modalParadero')">Cancelar</button>
+      <button class="btn-save" onclick="guardarParadero()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RUTA -->
+<div class="modal-bg" id="modalRuta">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="mRutaTitle">Agregar Ruta</div>
+      <button class="modal-x" onclick="cerrarModal('modalRuta')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field"><label>NÚMERO</label><input id="mrNumero" placeholder="Ej: 210"></div>
+        <div class="field"><label>NOMBRE</label><input id="mrNombre" placeholder="Ej: Alameda – Pudahuel"></div>
+        <div class="field"><label>CIUDAD</label>
+          <select id="mrCiudad"><option>Santiago</option><option>Rancagua</option><option>Valparaíso</option><option>Concepción</option><option>Temuco</option></select>
+        </div>
+        <div class="field"><label>TIPO</label>
+          <select id="mrTipo"><option value="micro">🚌 Micro / Bus</option><option value="colectivo">🚕 Colectivo</option></select>
+        </div>
+        <div class="field"><label>FRECUENCIA (min)</label><input id="mrFrecuencia" type="number" placeholder="15"></div>
+        <div class="field"><label>COLOR</label><input id="mrColor" type="color" value="#3b82f6"></div>
+        <div class="field form-full"><label>HORARIOS LUN–VIE (separados por coma)</label><input id="mrHlv" placeholder="06:00,07:00,08:00,12:00,18:00,21:00"></div>
+        <div class="field form-full"><label>HORARIOS SÁBADO</label><input id="mrHsa" placeholder="08:00,10:00,13:00,17:00,21:00"></div>
+        <div class="field form-full"><label>HORARIOS DOMINGO</label><input id="mrHdo" placeholder="10:00,13:00,17:00,20:00"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modalRuta')">Cancelar</button>
+      <button class="btn-save" onclick="guardarRuta()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/db.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
